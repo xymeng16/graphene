@@ -1297,7 +1297,7 @@ static ssize_t do_recvmsg(int fd, struct iovec* bufs, size_t nbufs, int flags,
         goto out;
     }
 
-    lock(&hdl->lock);
+    lock(&hdl->lock); // Xiangyi: lock since we modify the sock here
 
     if (flags & MSG_WAITALL) {
         log_warning("recvmsg()/recvmmsg()/recvfrom(): MSG_WAITALL is ignored, may lead to a read"
@@ -1375,7 +1375,7 @@ static ssize_t do_recvmsg(int fd, struct iovec* bufs, size_t nbufs, int flags,
              * present in peek buffer; note that buffer can hold expected read size at this point */
             size_t left_to_read = expected_size - (peek_buffer->end - peek_buffer->start);
             ret = DkStreamRead(pal_hdl, /*offset=*/0, &left_to_read,
-                               &peek_buffer->buf[peek_buffer->end], uri, uri ? SOCK_URI_SIZE : 0);
+                               &peek_buffer->buf[peek_buffer->end], uri, uri ? SOCK_URI_SIZE : 0); // xiangyi: Will this function block if the data is not enough?
             /* TODO: shouldn't we call `maybe_epoll_et_trigger` here? */
             if (ret < 0) {
                 ret = ret == -PAL_ERROR_STREAMNOTEXIST ? -ECONNABORTED : pal_to_unix_errno(ret);
@@ -1399,7 +1399,7 @@ static ssize_t do_recvmsg(int fd, struct iovec* bufs, size_t nbufs, int flags,
         if (peek_buffer) {
             /* some data left to read from peek buffer */
             assert(total_bytes < peek_buffer->end - peek_buffer->start);
-            iov_bytes = MIN(bufs[i].iov_len, peek_buffer->end - peek_buffer->start - total_bytes);
+            iov_bytes = MIN(bufs[i].iov_len, peek_buffer->end - peek_buffer->start - total_bytes); // Xiangyi: need to modify the min value to support MSG_WAITALL
             memcpy(bufs[i].iov_base, &peek_buffer->buf[peek_buffer->start + total_bytes],
                    iov_bytes);
             uri = peek_buffer->uri;
